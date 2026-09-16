@@ -62,4 +62,7 @@ body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 syste
 .card img, .card video { max-width: 100%; max-height: 70svh; display: block; }
 .card pre { white-space: pre-wrap; background: var(--bg); padding: 10px; border-radius: 8px; }
 .card a { color: var(--acc); }
-footer { margin: 12px 0 30px; }
+.status { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 12px 0 30px; padding-top: 8px; border-top: 1px solid var(--line); color: var(--mut); font-size: 13px; }
+.st-path { color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 320px; }
+.perms { display: inline-flex; gap: 3px; }
+.perm { background: var(--bg2); border: 1px solid var(--line); color: var(--acc); border-radius: 4px; padding: 0 5px; font-size: 12px; font-weight: 600; cursor: default; }

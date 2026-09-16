@@ -32,6 +32,46 @@ const isImg = (h: string) => /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(h);
 const isVid = (h: string) => /\.(mp4|webm|ogv|mov|mkv)$/i.test(h);
 const isAud = (h: string) => /\.(mp3|opus|ogg|flac|wav|m4a)$/i.test(h);
 
+/** el backend mete HTML en srvinf ("srv</span> // <span>66 GiB free")
+ *  pensado para su UI vieja: lo reducimos a texto [nombre, espacio] */
+function cleanSrvInf(srvinf?: string): [string, string] {
+  if (!srvinf) return ["", ""];
+  const txt = srvinf.replace(/<[^>]*>/g, "").replace(/\s+/g, " ").trim();
+  const [name = "", free = ""] = txt.split("//").map((s) => s.trim());
+  return [name, free];
+}
+
+/** perms del ?ls (read/write/...) -> letra corta estilo volflags (rwmda.) */
+const PERM_SHORT: Record<string, string> = {
+  read: "r", write: "w", move: "m", delete: "d", get: "g",
+  upget: "G", html: "h", dots: ".", admin: "a",
+};
+
+function PermChips({ perms }: { perms: string[] }) {
+  if (!perms.length) return <span class="mut">sin permisos</span>;
+  return (
+    <span class="perms" title={perms.join(", ")}>
+      {perms.map((p) => (
+        <b key={p} class="perm" title={p}>{PERM_SHORT[p] ?? p.slice(0, 1)}</b>
+      ))}
+    </span>
+  );
+}
+
+function StatusBar({ data }: { data: LsResponse }) {
+  const { vpath } = useUi();
+  const [srvName, srvFree] = cleanSrvInf(data.srvinf);
+  return (
+    <footer class="status">
+      <span class="st-path" title={vpath}>📁 {decodeURIComponent(vpath)}</span>
+      <span class="mut">{data.dirs.length} dirs · {data.files.length} files</span>
+      {srvName && <span class="mut">{srvName}</span>}
+      {srvFree && <span class="mut">{srvFree}</span>}
+      <PermChips perms={data.perms ?? []} />
+    </footer>
+  );
+}
+
 function useLs() {
   const { vpath, auth, dots, setSession, setLoginOpen } = useUi();
   const [data, setData] = useState<LsResponse | null>(null);
@@ -375,11 +415,7 @@ export function App() {
           </section>
         )}
         {data && <FileList dirs={data.dirs} files={data.files} onOpen={setView} />}
-        {data && (
-          <footer class="mut">
-            {data.dirs.length} dirs · {data.files.length} files · {data.acct ? `acct ${data.acct} · ` : ""}{data.srvinf || ""} · perms {(data.perms || []).join("")}
-          </footer>
-        )}
+        {data && <StatusBar data={data} />}
       </main>
 
       <Viewer entry={view} onClose={() => setView(null)} />
