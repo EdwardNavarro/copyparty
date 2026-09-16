@@ -1,0 +1,25 @@
+{
+  "name": "web-ui",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@tanstack/query-core": "^5.102.8",
+    "@tanstack/virtual-core": "^3.17.11",
+    "hash-wasm": "^4.12.0",
+    "preact": "^10.29.8",
+    "wouter": "^3.11.0",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@preact/preset-vite": "^2.10.6",
+    "@types/node": "^24.13.3",
+    "typescript": "~6.0.2",
+    "vite": "^8.3.0"
+  }
+}
