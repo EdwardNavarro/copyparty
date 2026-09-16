@@ -73,7 +73,7 @@ function StatusBar({ data }: { data: LsResponse }) {
 }
 
 function useLs() {
-  const { vpath, auth, dots, setSession, setLoginOpen } = useUi();
+  const { vpath, auth, dots, setSession } = useUi();
   const [data, setData] = useState<LsResponse | null>(null);
   const [err, setErr] = useState("");
   const [authErr, setAuthErr] = useState(false);
@@ -89,14 +89,12 @@ function useLs() {
     } catch (e: any) {
       const msg = e.message || String(e);
       setErr(msg);
-      if (isAuthError(e)) {
-        setAuthErr(true);
-        setLoginOpen(true); // 401/403 -> pedir login en vez de mostrar error crudo
-      }
+      // 401/403 -> lo muestra LoginPage (no abrir el modal encima)
+      if (isAuthError(e)) setAuthErr(true);
     } finally {
       setLoading(false);
     }
-  }, [vpath, auth, dots, setSession, setLoginOpen]);
+  }, [vpath, auth, dots, setSession]);
   useEffect(() => {
     load();
   }, [load]);
@@ -122,8 +120,8 @@ function Crumbs() {
   );
 }
 
-/** modal login cookie HttpOnly: POST multipart act=login (ver splash.html) */
-function LoginModal({ onDone }: { onDone: () => void }) {
+/** form login cookie HttpOnly: POST multipart act=login (ver splash.html) */
+function LoginForm({ onDone }: { onDone: () => void }) {
   const { vpath } = useUi();
   const [uname, setUname] = useState("");
   const [pw, setPw] = useState("");
@@ -149,23 +147,45 @@ function LoginModal({ onDone }: { onDone: () => void }) {
     ? IDP_LOGIN.replace("{dst}", encodeURIComponent(location.pathname + location.hash))
     : "";
   return (
+    <>
+      <p class="mut">La sesión se guarda en cookie HttpOnly del navegador (no accesible desde JS).</p>
+      <p class="mut small">modo: {useUi.getState().auth.base ? `⚠️ directo cross-origin (${useUi.getState().auth.base}) — el login no funcionará` : "✅ proxy mismo-origen"}</p>
+      <form onSubmit={submit}>
+        <input placeholder="usuario (vacío si solo hay password)" value={uname}
+          onInput={(e) => setUname((e.target as HTMLInputElement).value)} autocomplete="username" />
+        <input type="password" placeholder="password" value={pw}
+          onInput={(e) => setPw((e.target as HTMLInputElement).value)} autocomplete="current-password" />
+        {err && <p class="err">{err}</p>}
+        <div class="row-btns">
+          <button type="submit" disabled={busy || !pw}>{busy ? "…" : "entrar"}</button>
+          {idpHref && <a class="btn" href={idpHref}>entrar con SSO (IdP)</a>}
+        </div>
+      </form>
+      {!IDP_LOGIN && <p class="mut small">SSO/Authentik: define VITE_IDP_LOGIN="https://auth…?dst={'{dst}'}" para activar el botón.</p>}
+    </>
+  );
+}
+
+function LoginModal({ onDone }: { onDone: () => void }) {
+  return (
     <div class="modal" onClick={() => useUi.getState().setLoginOpen(false)}>
       <div class="card login" onClick={(e) => e.stopPropagation()}>
         <header><b>🔐 login</b><button onClick={() => useUi.getState().setLoginOpen(false)}>✕</button></header>
-        <p class="mut">La sesión se guarda en cookie HttpOnly del navegador (no accesible desde JS).</p>
-        <p class="mut small">modo: {useUi.getState().auth.base ? `⚠️ directo cross-origin (${useUi.getState().auth.base}) — el login no funcionará` : "✅ proxy mismo-origen"}</p>
-        <form onSubmit={submit}>
-          <input placeholder="usuario (vacío si solo hay password)" value={uname}
-            onInput={(e) => setUname((e.target as HTMLInputElement).value)} autocomplete="username" />
-          <input type="password" placeholder="password" value={pw}
-            onInput={(e) => setPw((e.target as HTMLInputElement).value)} autocomplete="current-password" />
-          {err && <p class="err">{err}</p>}
-          <div class="row-btns">
-            <button type="submit" disabled={busy || !pw}>{busy ? "…" : "entrar"}</button>
-            {idpHref && <a class="btn" href={idpHref}>entrar con SSO (IdP)</a>}
-          </div>
-        </form>
-        {!IDP_LOGIN && <p class="mut small">SSO/Authentik: define VITE_IDP_LOGIN="https://auth…?dst={'{dst}'}" para activar el botón.</p>}
+        <LoginForm onDone={onDone} />
+      </div>
+    </div>
+  );
+}
+
+/** página completa cuando el servidor exige auth (401/403 en ?ls) */
+function LoginPage({ onDone }: { onDone: () => void }) {
+  const { vpath } = useUi();
+  return (
+    <div class="login-page">
+      <div class="card login big">
+        <b class="logo">copyparty <span>next</span></b>
+        <p class="mut">🔐 <b>{decodeURIComponent(vpath)}</b> requiere autenticación.</p>
+        <LoginForm onDone={onDone} />
       </div>
     </div>
   );
@@ -307,7 +327,7 @@ function Viewer({ entry, onClose }: { entry: LsEntry | null; onClose: () => void
 }
 
 export function App() {
-  const { vpath, auth, grid, toggleGrid, dots, toggleDots, query, setQuery, sel, clearSel, loginOpen, setSession } = useUi();
+  const { vpath, auth, acct, grid, toggleGrid, dots, toggleDots, query, setQuery, sel, clearSel, loginOpen, setSession } = useUi();
   const { data, err, authErr, loading, reload } = useLs();
   const [view, setView] = useState<LsEntry | null>(null);
   const [sr, setSr] = useState<SearchResponse | null>(null);
@@ -375,6 +395,21 @@ export function App() {
     reload();
   }, [sel, auth, reload, clearSel]);
 
+  // página de login dedicada cuando no hay sesión útil:
+  //  - ?ls 401/403 (authErr), o
+  //  - anónimo sin read/get (volúmenes privados devuelven 200-vacío, no 401)
+  // los volúmenes públicos (anon con read) siguen entrando al browser
+  const perms = data?.perms ?? [];
+  const needLogin =
+    !loading && (authErr || (acct === "*" && data !== null && !perms.includes("read") && !perms.includes("get")));
+  if (needLogin) {
+    return (
+      <div class="app">
+        <LoginPage onDone={reload} />
+      </div>
+    );
+  }
+
   return (
     <div class="app">
       <header class="top">
@@ -407,7 +442,6 @@ export function App() {
       <main onDragOver={(e) => e.preventDefault()} onDrop={(e) => { e.preventDefault(); onFiles(e.dataTransfer?.files || null); }}>
         {loading && <p class="mut">cargando ?ls…</p>}
         {err && !authErr && <p class="err">{err} <button onClick={reload}>reintentar</button></p>}
-        {authErr && <p class="err">🔐 sesión requerida — <button onClick={() => useUi.getState().setLoginOpen(true)}>login</button></p>}
         {sr && (
           <section class="sr">
             <header>{sr.hits.length} hits {sr.trunc ? "(truncado)" : ""} <button onClick={() => setSr(null)}>✕</button></header>

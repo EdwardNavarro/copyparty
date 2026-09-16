@@ -48,6 +48,10 @@ body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 syste
 .up-top button { background: none; border: 1px solid var(--line); color: var(--danger); border-radius: 5px; padding: 1px 7px; cursor: pointer; }
 .up-stats { display: flex; flex-direction: column; gap: 1px; color: var(--mut); font-size: 12px; font-variant-numeric: tabular-nums; }
 .card.login { max-width: 380px; }
+.login-page { min-height: 80svh; display: grid; place-items: center; padding: 24px 12px; }
+.card.login.big { max-width: 420px; text-align: center; }
+.card.login.big .logo { font-size: 28px; display: block; margin-bottom: 4px; }
+.card.login.big form { text-align: left; }
 .card.login form { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
 .card.login input { background: var(--bg); border: 1px solid var(--line); color: var(--fg); border-radius: 6px; padding: 8px 10px; }
 .card.login .row-btns { display: flex; gap: 8px; align-items: center; }
